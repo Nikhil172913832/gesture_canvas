@@ -1,1 +1,4 @@
 ultralytics
+numpy
+opencv-python
+scipy
