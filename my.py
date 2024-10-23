@@ -8,8 +8,9 @@ hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_c
 mp_draw = mp.solutions.drawing_utils
 
 # Drawing variables
-drawing_mode = False  # Initially not in drawing mode
-erase_mode = False    # Erase mode
+write_mode = False  # Initially not in writing mode
+erase_mode = False  # Initially not in erase mode
+stop_mode = True  # Initially in stop mode
 previous_point = None  # Store the previous point to draw lines smoothly
 canvas = None  # Create a canvas to draw on
 
@@ -47,7 +48,7 @@ while True:
             middle_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
             ring_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_TIP]
             pinky_tip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP]
-            
+
             # Convert the landmark positions to pixel coordinates
             cx_thumb, cy_thumb = int(thumb_tip.x * w), int(thumb_tip.y * h)
             cx_index, cy_index = int(index_finger_tip.x * w), int(index_finger_tip.y * h)
@@ -55,47 +56,65 @@ while True:
             cx_ring, cy_ring = int(ring_finger_tip.x * w), int(ring_finger_tip.y * h)
             cx_pinky, cy_pinky = int(pinky_tip.x * w), int(pinky_tip.y * h)
 
-            # Check distance between thumb and index finger tips (for drawing mode)
-            thumb_index_dist = np.sqrt((cx_thumb - cx_index) ** 2 + (cy_thumb - cy_index) ** 2)
-            
-            # Measure the spread of all fingers (for erasing)
-            finger_spread = np.sqrt((cx_index - cx_middle)**2 + (cy_index - cy_middle)**2) + \
-                            np.sqrt((cx_middle - cx_ring)**2 + (cy_middle - cy_ring)**2) + \
-                            np.sqrt((cx_ring - cx_pinky)**2 + (cy_ring - cy_pinky)**2)
+            # Check distances between adjacent fingers for erase mode
+            index_middle_dist = np.sqrt((cx_index - cx_middle) ** 2 + (cy_index - cy_middle) ** 2)
+            middle_ring_dist = np.sqrt((cx_middle - cx_ring) ** 2 + (cy_middle - cy_ring) ** 2)
+            ring_pinky_dist = np.sqrt((cx_ring - cx_pinky) ** 2 + (cy_ring - cy_pinky) ** 2)
 
-            # If all fingers are spread wide enough, enter erase mode (open palm gesture)
-            if finger_spread > 250:  # Adjust this threshold if needed
-                erase_mode = True
-                drawing_mode = False
-            else:
+            # Set a threshold for the distances to detect no gaps
+            distance_threshold = 30  # Adjust this for sensitivity
+
+            # If the thumb and index fingers are close together, activate write mode (pinch gesture)
+            if np.sqrt((cx_thumb - cx_index) ** 2 + (cy_thumb - cy_index) ** 2) < 40:
+                write_mode = True
                 erase_mode = False
-
-            # If the distance is small, activate drawing mode (pinch gesture)
-            if not erase_mode and thumb_index_dist < 40:
-                drawing_mode = True
+                stop_mode = False
+            # If there are no gaps between the fingers, activate erase mode
+            elif (index_middle_dist < distance_threshold and 
+                  middle_ring_dist < distance_threshold and 
+                  ring_pinky_dist < distance_threshold):
+                write_mode = False
+                erase_mode = True
+                stop_mode = False
             else:
-                drawing_mode = False
+                # Enter stop mode when no gesture is detected
+                write_mode = False
+                erase_mode = False
+                stop_mode = True
 
-            # Erase or draw based on the mode
-            if erase_mode:
-                # Draw a black circle where the index finger tip is to simulate erasing
-                cv2.circle(canvas, (cx_index, cy_index), 30, (0, 0, 0), thickness=-1)  # Erase by drawing black circle
-            elif drawing_mode:
+            # Write mode: Draw based on finger movement
+            if write_mode:
                 if previous_point:
                     # Draw a line from the previous point to the current point on the canvas
                     cv2.line(canvas, previous_point, (cx_index, cy_index), (0, 0, 255), thickness=5)
                 previous_point = (cx_index, cy_index)
+            # Erase mode: Clear the area around the index position
+            elif erase_mode:
+                # Draw a large filled circle at the index finger's position to erase
+                cv2.circle(canvas, (cx_index, cy_index), 50, (0, 0, 0), -1)  # Erase with a black circle
+                previous_point = (cx_index, cy_index)  # Update previous point for potential continuity
             else:
                 previous_point = None
-    
+
     # Merge the canvas with the webcam feed
     img_combined = cv2.addWeighted(img, 0.5, canvas, 0.5, 0)
 
-    # Show the combined image
-    cv2.imshow("Gesture Canvas with Erase", img_combined)
+    # Determine the current mode
+    if write_mode:
+        mode_text = "Mode: Writing"
+    elif erase_mode:
+        mode_text = "Mode: Erasing"
+    else:
+        mode_text = "Mode: Stopped"
 
-    # Exit on 'ESC'
-    if cv2.waitKey(1) & 0xFF == 27:
+    # Add the mode text to the image
+    cv2.putText(img_combined, mode_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+    # Show the combined image
+    cv2.imshow("Gesture Canvas with Write and Erase Mode", img_combined)
+
+    # Exit on 'q'
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 # Release the capture and close all windows
