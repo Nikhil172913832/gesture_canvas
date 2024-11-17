@@ -3,116 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gesture Canvas</title>
+    <title>Smart Gesture Canvas</title>
     <style>
-        body, html {
+        body {
             margin: 0;
-            padding: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: calc(100% - 40px);
+            height: calc(100vh - 140px);
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #video-feed {
             width: 100%;
             height: 100%;
-            overflow: hidden; /* Prevent scrollbars */
-            background-color: black; /* Optional background color */
+            object-fit: contain;
+            border-radius: 16px;
         }
-        #canvas {
-            width: 75%;  /* 75% width for the canvas */
-            height: 100%; /* Full height */
-            background-color: white; /* White background for drawing */
-            position: absolute; /* Position it absolutely */
-            left: 0; /* Align to the left */
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
         }
-        #videoContainer {
-            position: absolute;
-            top: 20px; /* Distance from the top */
-            right: 20px; /* Distance from the right */
-            width: 20%; /* Small width for the video feed */
-            height: 20%; /* Small height for the video feed */
-        }
-        #video {
-            width: 100%; /* Full width of the container */
-            height: 100%; /* Full height of the container */
-            object-fit: cover; /* Maintain aspect ratio */
-        }
-        #save-btn {
-            position: absolute;
-            top: 20px;  /* Distance from the top */
-            left: 20px; /* Distance from the left */
-            padding: 10px;
-            background-color: green;
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: rgba(76, 175, 80, 0.9);
             color: white;
             border: none;
+            border-radius: 4px;
             cursor: pointer;
-            z-index: 100; /* Ensure the button is above other elements */
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background-color: rgba(69, 160, 73, 1);
+        }
+
+        .help-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(33, 150, 243, 0.9);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .help-content {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            width: 300px;
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+        }
+
+        .help-btn:hover .help-content {
+            display: block;
+        }
+
+        .help-content h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .help-content ul {
+            list-style-position: inside;
+            padding: 0;
+        }
+
+        .help-content li {
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .mode-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+
+        .save-options {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1001;
+        }
+
+        .save-options.active {
+            display: block;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 1000;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .mode-selector {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <h1 style="color: white; position: absolute; top: 20px; left: 20px; z-index: 100;">Gesture Canvas with Write and Erase Modes</h1>
-    <canvas id="canvas"></canvas>
-    <div id="videoContainer">
-        <img id="video" src="{{ url_for('video_feed') }}">
+    <div class="mode-indicator" id="modeIndicator">Mode: Drawing</div>
+    
+    <div class="canvas-container">
+        <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
     </div>
-    <button id="save-btn">Save Drawing</button>
+
+    <div class="controls">
+        <div class="help-btn">?
+            <div class="help-content">
+                <h2>How to Use</h2>
+                <ul>
+                    <li>✍️ To Draw: Bring your thumb and index finger together</li>
+                    <li>🖐️ To Erase: Close all fingers together</li>
+                    <li>✋ To Stop: Keep fingers apart</li>
+                    <li>📝 Math Mode: Write equations to solve them</li>
+                    <li>❓ Question Mode: Write questions to get answers</li>
+                </ul>
+            </div>
+        </div>
+        <button class="btn" onclick="clearCanvas()">Clear</button>
+        <button class="btn" onclick="showSaveOptions()">Save</button>
+    </div>
+
+    <div class="mode-selector">
+        <button class="btn" onclick="setMode('drawing')">Drawing</button>
+        <button class="btn" onclick="setMode('math')">Math Solver</button>
+        <button class="btn" onclick="setMode('question')">Q&A</button>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="save-options" id="saveOptions">
+        <h2>Save Options</h2>
+        <button class="btn" onclick="saveAsImage()">Save as Image</button>
+        <button class="btn" onclick="saveAsPDF()">Save as PDF</button>
+        <button class="btn" onclick="closeSaveOptions()">Cancel</button>
+    </div>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const saveButton = document.getElementById('save-btn');
-        const videoStream = document.getElementById('video');
-        
-        // Set canvas size to fill the 75% width
-        function resizeCanvas() {
-            canvas.width = window.innerWidth * 0.75; // 75% of window width
-            canvas.height = window.innerHeight; // Full window height
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas(); // Initial canvas size
+        let currentMode = 'drawing';
 
-        // Draw the camera feed onto the canvas
-        function draw() {
-            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height); // Draw video on canvas
-            requestAnimationFrame(draw); // Request to draw the next frame
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('modeIndicator').textContent = `Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+            fetch(`/set_mode/${mode}`);
         }
 
-        // Start drawing the video stream
-        videoStream.onload = function() {
-            draw(); // Start drawing when the video stream is ready
-        };
+        function clearCanvas() {
+            fetch('/clear')
+                .then(response => console.log('Canvas cleared'))
+                .catch(error => console.error('Error clearing canvas:', error));
+        }
 
-        saveButton.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL(); // Convert canvas to data URL
-            link.download = 'gesture_drawing.png'; // Set the download filename
-            link.click(); // Trigger the download
-        });
+        function showSaveOptions() {
+            document.getElementById('overlay').classList.add('active');
+            document.getElementById('saveOptions').classList.add('active');
+        }
 
-        // Drawing functionality on the canvas
-        let drawing = false;
-        let previousPoint = null;
+        function closeSaveOptions() {
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('saveOptions').classList.remove('active');
+        }
 
-        canvas.addEventListener('mousedown', (e) => {
-            drawing = true;
-            previousPoint = { x: e.clientX - canvas.offsetLeft, y: e.clientY - canvas.offsetTop };
-        });
+        function saveAsImage() {
+            fetch('/save_image')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'canvas.png';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    closeSaveOptions();
+                });
+        }
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (!drawing) return;
-            const currentPoint = { x: e.clientX - canvas.offsetLeft, y: e.clientY - canvas.offsetTop };
-            ctx.beginPath();
-            ctx.moveTo(previousPoint.x, previousPoint.y);
-            ctx.lineTo(currentPoint.x, currentPoint.y);
-            ctx.strokeStyle = 'red'; // Color for drawing
-            ctx.lineWidth = 5; // Thickness of the line
-            ctx.stroke();
-            previousPoint = currentPoint;
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            drawing = false;
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-            drawing = false;
-        });
+        function saveAsPDF() {
+            fetch('/save_pdf')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'canvas.pdf';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    closeSaveOptions();
+                });
+        }
     </script>
 </body>
 </html>

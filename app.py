@@ -5,7 +5,7 @@ import numpy as np
 
 app = Flask(__name__)
 
-# Initialize MediaPipe and OpenCV (from your original code)
+# Initialize MediaPipe and OpenCV
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.7)
 mp_draw = mp.solutions.drawing_utils
@@ -20,23 +20,29 @@ def generate_frames():
     global write_mode, erase_mode, stop_mode, previous_point, canvas
 
     cap = cv2.VideoCapture(0)
+    success, img = cap.read()
+    if success:
+        h, w, _ = img.shape
+        if canvas is None:
+            # Initialize white canvas
+            canvas = np.ones((h, w, 3), dtype=np.uint8) * 255
+
     while True:
         success, img = cap.read()
         if not success:
             break
 
         img = cv2.flip(img, 1)
-        h, w, _ = img.shape
-        
-        if canvas is None:
-            canvas = np.zeros((h, w, 3), dtype=np.uint8)
-
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = hands.process(img_rgb)
 
+        # Create a copy of the canvas for displaying hand landmarks
+        display_frame = canvas.copy()
+
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                mp_draw.draw_landmarks(img, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                # Draw hand landmarks on the display frame
+                mp_draw.draw_landmarks(display_frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
                 thumb_tip = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
                 index_finger_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
@@ -76,13 +82,12 @@ def generate_frames():
                         cv2.line(canvas, previous_point, (cx_index, cy_index), (0, 0, 255), thickness=5)
                     previous_point = (cx_index, cy_index)
                 elif erase_mode:
-                    cv2.circle(canvas, (cx_index, cy_index), 50, (0, 0, 0), -1)
+                    cv2.circle(canvas, (cx_index, cy_index), 50, (255, 255, 255), -1)
                     previous_point = (cx_index, cy_index)
                 else:
                     previous_point = None
 
-        img_combined = cv2.addWeighted(img, 0.5, canvas, 0.5, 0)
-        ret, buffer = cv2.imencode('.jpg', img_combined)
+        ret, buffer = cv2.imencode('.jpg', display_frame)
         frame = buffer.tobytes()
         
         yield (b'--frame\r\n'
@@ -96,5 +101,12 @@ def index():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/clear')
+def clear_canvas():
+    global canvas
+    if canvas is not None:
+        canvas = np.ones_like(canvas) * 255
+    return 'Canvas cleared'
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=3000)
