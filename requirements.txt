@@ -1,2 +1,6 @@
 mediapipe
 flask
+FPDF
+sympy
+tesseract
+
