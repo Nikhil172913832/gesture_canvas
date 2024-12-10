@@ -4,10 +4,16 @@ import mediapipe as mp
 import numpy as np
 from flask import send_file
 import io
-import pytesseract
-from sympy import sympify
+import os
+from pix2text import Pix2Text, merge_line_texts
+import sympy as sp
+API_KEY = "AIzaSyCWzQldFI5hgyacHqfmr17a1z9EzSPmOvM"
+import google.generativeai as genai
+import re
 
+genai.configure(api_key=API_KEY)
 app = Flask(__name__)
+p2t = Pix2Text.from_config( providers='CPUExecutionProvider')
 
 # Initialize MediaPipe and OpenCV
 mp_hands = mp.solutions.hands
@@ -19,11 +25,14 @@ erase_mode = False
 stop_mode = True
 math_mode = False
 previous_point = None
+frame_captured = False
 canvas = None
 current_color = (0, 0, 0)
 current_thickness = 5
+def is_finger_up(hand_landmarks, finger_tip_id, finger_mcp_id):
+    return hand_landmarks.landmark[finger_tip_id].y < hand_landmarks.landmark[finger_mcp_id].y
 def generate_frames():
-    global write_mode, erase_mode, stop_mode, math_mode, previous_point, canvas, current_color, current_thickness
+    global write_mode, erase_mode, stop_mode, math_mode, previous_point, canvas, current_color, current_thickness, frame_captured
 
     cap = cv2.VideoCapture(0)
     success, img = cap.read()
@@ -65,23 +74,37 @@ def generate_frames():
                 index_middle_dist = np.sqrt((cx_index - cx_middle) ** 2 + (cy_index - cy_middle) ** 2)
                 middle_ring_dist = np.sqrt((cx_middle - cx_ring) ** 2 + (cy_middle - cy_ring) ** 2)
                 ring_pinky_dist = np.sqrt((cx_ring - cx_pinky) ** 2 + (cy_ring - cy_pinky) ** 2)
-
+                
+                TIP = [8, 12]  
+                MCP = [5, 9] 
                 distance_threshold = 30
 
-                if np.sqrt((cx_thumb - cx_index) ** 2 + (cy_thumb - cy_index) ** 2) < 40:
+                #detect victory symbol
+                if(is_finger_up(hand_landmarks, 8, 5) and is_finger_up(hand_landmarks, 12, 9) and not is_finger_up(hand_landmarks, 16, 13) and not is_finger_up(hand_landmarks, 20, 17)):
+                # if (is_finger_up(8, 5) and is_finger_up(12, 9) and index_middle_dist > distance_threshold and  middle_ring_dist < distance_threshold and ring_pinky_dist < distance_threshold):
+                    math_mode = True
+                    write_mode = False
+                    erase_mode = False
+                    stop_mode = False
+                elif np.sqrt((cx_thumb - cx_index) ** 2 + (cy_thumb - cy_index) ** 2) < 40:
                     write_mode = True
                     erase_mode = False
                     stop_mode = False
+                    math_mode = False
+
                 elif (index_middle_dist < distance_threshold and 
                       middle_ring_dist < distance_threshold and 
                       ring_pinky_dist < distance_threshold):
                     write_mode = False
                     erase_mode = True
                     stop_mode = False
+                    math_mode = False
                 else:
                     write_mode = False
                     erase_mode = False
                     stop_mode = True
+                    math_mode = False
+                    frame_captured = False
 
                 if write_mode:
                     if previous_point:
@@ -90,8 +113,66 @@ def generate_frames():
                 elif erase_mode:
                     cv2.circle(canvas, (cx_index, cy_index), 50, (255, 255, 255), -1)
                     previous_point = (cx_index, cy_index)
+                elif math_mode:
+                    if(frame_captured):
+                        continue
+                    cv2.imwrite("captured_frame.jpg", canvas)
+                    temp_filename = "captured_frame.jpg"
+                    try:
+                        # Initialize Pix2Text
+                        
+
+                        # # Recognize pure formula images
+                        # outs = p2t.recognize_formula([temp_filename])
+                        # print("Formula Recognition Output:", outs)
+
+                        # Recognize mixed content images (text + formula)
+                        outs2 = p2t.recognize(temp_filename, file_type='text_formula', return_text=True)
+                        print("Mixed Content Recognition Output:", outs2)
+                        result = re.sub(r'[^a-zA-Z0-9\+\-\*/\^()\s]', '', outs2)
+                        try:
+                            # Assuming result is a symbolic expression from sympy
+                            result = sp.sympify(result)
+
+                            # Convert the result to string for text rendering
+                            result_str = str(result)
+
+                            # Display result in the top-right corner of the canvas
+                            font_scale = 1
+                            thickness = 2
+                            font = cv2.FONT_HERSHEY_SIMPLEX
+
+                            # Calculate text size to adjust positioning
+                            text_size = cv2.getTextSize(result_str, font, font_scale, thickness)[0]
+                            text_x = canvas.shape[1] - text_size[0] - 10  # 10px padding from right edge
+                            text_y = text_size[1] + 10  # 10px padding from top edge
+
+                            # Draw a white rectangle as the background for the text
+                            cv2.rectangle(canvas, 
+                                        (text_x - 5, text_y - text_size[1] - 5),  # Top-left corner of the rectangle
+                                        (text_x + text_size[0] + 5, text_y + 5),  # Bottom-right corner
+                                        (255, 255, 255),  # White background
+                                        -1)  # Filled rectangle
+
+                            # Overlay the text on top of the rectangle
+                            cv2.putText(canvas, result_str, (text_x, text_y), font, font_scale, (0, 0, 255), thickness)
+
+                        except Exception as e:
+                            # Log the exception or print a message for debugging
+                            print(f"Error occurred: {e}")
+                    finally:
+                        # Ensure the temp file is deleted
+                        if os.path.exists(temp_filename):
+                            os.remove(temp_filename)
+                        pass
+                    math_mode=False
+                    write_mode=False
+                    erase_mode=False
+                    stop_mode=True
+                    frame_captured = True
                 else:
                     previous_point = None
+                
 
         ret, buffer = cv2.imencode('.jpg', display_frame)
         frame = buffer.tobytes()
