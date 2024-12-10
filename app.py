@@ -7,11 +7,7 @@ import io
 import os
 from pix2text import Pix2Text, merge_line_texts
 import sympy as sp
-API_KEY = "AIzaSyCWzQldFI5hgyacHqfmr17a1z9EzSPmOvM"
-import google.generativeai as genai
 import re
-
-genai.configure(api_key=API_KEY)
 app = Flask(__name__)
 p2t = Pix2Text.from_config( providers='CPUExecutionProvider')
 
