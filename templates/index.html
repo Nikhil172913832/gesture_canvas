@@ -8,7 +8,7 @@
     <title>Smart Gesture Canvas</title>
 </head>
 <body>
-    <div class="mode-indicator" id="modeIndicator">Mode: Drawing</div>
+    
     
     <div class="canvas-container">
         <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
@@ -31,18 +31,10 @@
         <button class="btn" onclick="clearCanvas()">Clear</button>
         <button class="btn" onclick="showSaveOptions()">Save</button>
     </div>
-
-    <div class="mode-selector">
-        <button class="btn" onclick="setMode('drawing')">Drawing</button>
-        <button class="btn" onclick="setMode('math')">Math Solver</button>
-        <button class="btn" onclick="setMode('question')">Q&A</button>
-    </div>
-
-    <!-- Move color and thickness options to the bottom-right -->
     <div class="color-thickness-controls">
         <label for="colorPicker">Choose Color:</label>
         <input type="color" id="colorPicker" value="#000000">
-        
+
         <label for="thickness">Thickness:</label>
         <input type="number" id="thickness" value="5" min="1" max="50">
     </div>

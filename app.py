@@ -123,7 +123,7 @@ def generate_frames():
                         # print("Formula Recognition Output:", outs)
 
                         # Recognize mixed content images (text + formula)
-                        outs2 = p2t.recognize(temp_filename, file_type='text_formula', return_text=True)
+                        outs2 = p2t.recognize(temp_filename)
                         print("Mixed Content Recognition Output:", outs2)
                         result = re.sub(r'[^a-zA-Z0-9\+\-\*/\^()\s]', '', outs2)
                         try:
@@ -132,7 +132,7 @@ def generate_frames():
 
                             # Convert the result to string for text rendering
                             result_str = str(result)
-
+                            result_str = "Result: " + result_str
                             # Display result in the top-right corner of the canvas
                             font_scale = 1
                             thickness = 2
@@ -255,6 +255,8 @@ def set_thickness():
     thickness = request.args.get('thickness', default=5, type=int)
     current_thickness = thickness
     return 'Thickness set'
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=3000)

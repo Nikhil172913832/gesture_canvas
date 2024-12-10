@@ -11,6 +11,7 @@ document.getElementById('thickness').addEventListener('input', (event) => {
     thickness = event.target.value;
     fetch(`/set_thickness?thickness=${encodeURIComponent(thickness)}`);
 });
+
 function setMode(mode) {
     currentMode = mode;
     document.getElementById('modeIndicator').textContent = `Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
