@@ -2,5 +2,5 @@ mediapipe
 flask
 FPDF
 sympy
-tesseract
-
+pix2text
+onnxruntime-gpu
