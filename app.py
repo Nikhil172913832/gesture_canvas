@@ -9,7 +9,7 @@ from pix2text import Pix2Text, merge_line_texts
 import sympy as sp
 import re
 app = Flask(__name__)
-p2t = Pix2Text.from_config( providers='CPUExecutionProvider')
+p2t = Pix2Text.from_config( providers='CUDAExecutionProvider')
 
 # Initialize MediaPipe and OpenCV
 mp_hands = mp.solutions.hands
